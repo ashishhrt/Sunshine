@@ -1,9 +1,12 @@
 
 package com.example.android.sunshine.app;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.text.format.Time;
 import android.util.Log;
@@ -13,6 +16,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
@@ -28,8 +32,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * Encapsulates fetching the forecast and displaying it as a {@link ListView} layout.
@@ -37,6 +39,9 @@ import java.util.List;
 public class ForecastFragment extends Fragment {
 
     private ArrayAdapter<String> mForecastAdapter;
+
+    public static final String EXTRA_FORECAST = "com.example.android.sunshine.app.ForecastFragment.FORECAST";
+    public SharedPreferences sharedPreferences = null;
 
     public ForecastFragment() {
     }
@@ -46,6 +51,7 @@ public class ForecastFragment extends Fragment {
         super.onCreate(savedInstanceState);
         // Add this line in order for this fragment to handle menu events.
         setHasOptionsMenu(true);
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
     }
 
     @Override
@@ -53,6 +59,7 @@ public class ForecastFragment extends Fragment {
                              Bundle savedInstanceState) {
 
         // Create some dummy data for the ListView.  Here's a sample weekly forecast
+        /*
         String[] data = {
                 "Mon 6/23 - Sunny - 31/17",
                 "Tue 6/24 - Foggy - 21/8",
@@ -62,9 +69,8 @@ public class ForecastFragment extends Fragment {
                 "Sat 6/28 - TRAPPED IN WEATHERSTATION - 23/18",
                 "Sun 6/29 - Sunny - 20/7"
         };
-        List<String> weekForecast = new ArrayList<String>(Arrays.asList(data));
+        */
 
-        // Now that we have some dummy forecast data, create an ArrayAdapter.
         // The ArrayAdapter will take data from a source (like our dummy forecast) and
         // use it to populate the ListView it's attached to.
         mForecastAdapter =
@@ -72,10 +78,11 @@ public class ForecastFragment extends Fragment {
                         getActivity(), // The current context (this activity)
                         R.layout.list_item_forecast, // The name of the layout ID.
                         R.id.list_item_forecast_textview, // The ID of the textview to populate.
-                        weekForecast);
+                        new ArrayList<String>());
 
         //new FetchWeatherTask().execute();
-        new FetchWeatherTask().execute("201204");
+        //new FetchWeatherTask().execute(sharedPreferences.getString(PREF_LOCATION_KEY, ""));
+        //updateWeather();
 
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
@@ -83,7 +90,29 @@ public class ForecastFragment extends Fragment {
         ListView listView = (ListView) rootView.findViewById(R.id.listview_forecast);
         listView.setAdapter(mForecastAdapter);
 
+        //set onclick listener for the list items of the list view
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                /*Display a toast message containing the forecast string of clicked item*/
+                /*
+                Context context = getContext();
+                String message = mForecastAdapter.getItem(position);
+                int duration = Toast.LENGTH_SHORT;
 
+                Toast toast = Toast.makeText(context, message, duration);
+                toast.show();
+                */
+
+                /*Display the details of weather in the new activity i.e DetailActivity*/
+
+                String forecast = mForecastAdapter.getItem(position); //forecast data
+                Intent intent = new Intent(getContext(), DetailActivity.class);
+                intent.putExtra(ForecastFragment.EXTRA_FORECAST, forecast);
+                startActivity(intent);
+
+            }
+        });
 
         return rootView;
     }
@@ -98,6 +127,12 @@ public class ForecastFragment extends Fragment {
     }
 
     @Override
+    public void onStart() {
+        super.onStart();
+        updateWeather();
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
 
         // Handle action bar item clicks here. The action bar will
@@ -109,12 +144,19 @@ public class ForecastFragment extends Fragment {
         if( id == R.id.action_refresh ){
 
             //new FetchWeatherTask().execute();
-            new FetchWeatherTask().execute("201204");
+            //new FetchWeatherTask().execute(sharedPreferences.getString(PREF_LOCATION_KEY, ""));
+            updateWeather();
 
             return true;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    public void updateWeather(){
+        String PREF_LOCATION_KEY = getString(R.string.key_location);
+        new FetchWeatherTask().execute(sharedPreferences.getString(PREF_LOCATION_KEY, getString(R.string.default_location_value)));
+
     }
 
     public class FetchWeatherTask extends AsyncTask<String, Void, String[]> {
@@ -138,6 +180,16 @@ public class ForecastFragment extends Fragment {
             // For presentation, assume the user doesn't care about tenths of a degree.
             long roundedHigh = Math.round(high);
             long roundedLow = Math.round(low);
+
+            /**Check user temperature unit preference
+             * and perform the conversion as needed
+             */
+            if(sharedPreferences.getString(getString(R.string.key_unit), getString(R.string.default_unit_value)).equals("fahrenheit")){
+
+                roundedHigh = (roundedHigh * 9/5) + 32;
+                roundedLow = (roundedLow * 9/5) + 32;
+
+            }
 
             String highLowStr = roundedHigh + "/" + roundedLow;
             return highLowStr;
